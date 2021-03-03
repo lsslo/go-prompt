@@ -3,6 +3,7 @@ package prompt
 import (
 	"bytes"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/c-bata/go-prompt/internal/debug"
@@ -40,6 +41,37 @@ type Prompt struct {
 // Exec is the struct contains user input context.
 type Exec struct {
 	input string
+}
+
+// KnownCommands is the list of exact top-level verbs we accept.
+var KnownCommands []string
+
+// single-arg commands: when they come with 2 tokens, treat as “done”
+var singleArgClearCommands = map[string]bool{
+	"who":                true,
+	"change-task-status": true,
+	"clean-hash":         true,
+	"submit-hash-tree":   true,
+	"checkout":           true,
+	"find-similar":       true,
+	"cd":                 true,
+	"change-work-dir":    true,
+	"cwd":                true,
+}
+
+// SetKnownCommands installs your REPL's top-level commands.
+func SetKnownCommands(cmds []string) {
+	KnownCommands = cmds
+}
+
+// helper
+func contains(slice []string, s string) bool {
+	for _, v := range slice {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }
 
 // Run starts prompt.
@@ -122,9 +154,25 @@ func (p *Prompt) feed(b []byte) (shouldExit bool, exec *Exec) {
 	switch key {
 	case Enter, ControlJ, ControlM:
 		p.renderer.BreakLine(p.buf)
-
 		exec = &Exec{input: p.buf.Text()}
-		p.buf = NewBuffer()
+
+		parts := strings.Fields(exec.input)
+		cmd := ""
+		if len(parts) > 0 {
+			cmd = parts[0]
+		}
+		// clear when:
+		//  • single-word unknown commands, or bare change-work-dir
+		//  • any fully-fledged invocation (3 tokens)
+		//  • two-token invocations for commands that only take one arg
+		if (len(parts) == 1 && (!contains(KnownCommands, cmd) || cmd == "change-work-dir")) ||
+			len(parts) >= 3 ||
+			(len(parts) == 2 && singleArgClearCommands[cmd]) {
+			p.buf = NewBuffer()
+		} else {
+			p.buf = NewBufferWithText(exec.input)
+		}
+
 		if exec.input != "" {
 			p.history.Add(exec.input)
 		}
