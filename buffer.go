@@ -3,7 +3,7 @@ package prompt
 import (
 	"strings"
 
-	"github.com/c-bata/go-prompt/internal/debug"
+	"github.com/lsslo/go-prompt/internal/debug"
 )
 
 // Buffer emulates the console buffer.
@@ -188,4 +188,13 @@ func NewBuffer() (b *Buffer) {
 		preferredColumn: -1, // -1 means nil
 	}
 	return
+}
+
+func NewBufferWithText(text string) *Buffer {
+	b := NewBuffer()
+	b.workingLines = []string{text}
+	b.workingIndex = 0
+	b.cursorPosition = len([]rune(text))
+	b.preferredColumn = b.cursorPosition
+	return b
 }
